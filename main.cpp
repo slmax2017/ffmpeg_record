@@ -23,10 +23,10 @@ char buf[1024] = { 0 };
 //#define in_file_video "desktop"             
 #define in_file_video "video=screen-capture-recorder"             
 #define in_file_audio "audio=virtual-audio-capturer"
-//#define out_file "output.mp4"
+#define out_file "output.mp4"
 #define FRAME 14
 //#define in_file_audio "cuc_ieschool.mp3"
-#define out_file "rtmp://127.0.0.1:1935/live"
+//#define out_file "rtmp://127.0.0.1:1935/live"
 #define FIFO_NOT_ENOUGH 500 << 5
 #define FIFO_AGEIN 501 << 5 
 
@@ -57,9 +57,6 @@ char buf[1024] = { 0 };
                     return -1; \
                 } \
             }while(0) 
-
-
-
 
 
 int handle_audio_frame(AVAudioFifo *audio_fifo, AVFrame *audio_frame, AVCodecContext *audio_codec_ctx)
@@ -99,7 +96,7 @@ int main()
     void_handle(avformat_find_stream_info(in_vedio_ctx, NULL));
     void_handle(avformat_open_input(&in_audio_ctx, in_file_audio, av_find_input_format("dshow"), NULL));
     void_handle(avformat_find_stream_info(in_audio_ctx, NULL));
-    void_handle(avformat_alloc_output_context2(&out_ctx, NULL, "flv", out_file));
+    void_handle(avformat_alloc_output_context2(&out_ctx, NULL, NULL, out_file));
 
     //查找流通道
     int in_vedio_stream_index = -1, in_audio_stream_index = -1;
@@ -192,11 +189,11 @@ int main()
 
     //音频重采样
     AVFrame *frameAUDIO = av_frame_alloc();
-    frameAUDIO->channel_layout = out_audio_stream->codec->channel_layout;
+    //frameAUDIO->channel_layout = out_audio_stream->codec->channel_layout;
     frameAUDIO->format = out_audio_stream->codec->sample_fmt;
     frameAUDIO->sample_rate = out_audio_stream->codec->sample_rate;
     frameAUDIO->nb_samples = out_audio_stream->codec->frame_size;
-    av_frame_get_buffer(frameAUDIO, 0);
+    void_handle(av_frame_get_buffer(frameAUDIO, 0));
     SwrContext *ado_convert_ctx = swr_alloc_set_opts(NULL,
                                                     out_audio_stream->codec->channel_layout,
                                                     out_audio_stream->codec->sample_fmt,
@@ -226,7 +223,7 @@ int main()
     int ret = 0;                                         
     int vedio_encode_index = 0, audio_encode_index = 0;; 
     while (1) {                                          
-      //  if (audio_encode_index >= 2000 || vedio_encode_index >= 500) break;
+        if (audio_encode_index >= 2000 || vedio_encode_index >= 500) break;
         if (av_compare_ts(ts_a, in_vedio_stream->time_base, ts_b, in_audio_stream->time_base) <= 0) {
             cur_ctx = in_vedio_ctx;
             in_cur_stream = in_vedio_stream;
@@ -269,7 +266,6 @@ int main()
 
             if (!isVedio) {
                 ret = handle_audio_frame(audio_fifo, cur_frame, out_cur_codec_ctx);
-                printf("fifo size = %d\n", av_audio_fifo_size(audio_fifo));
                 if (ret == FIFO_NOT_ENOUGH) break; 
             }
 
@@ -316,6 +312,7 @@ int main()
     if (data)               av_free(data);
     if (img_convert_ctx)    sws_freeContext(img_convert_ctx);
     if (ado_convert_ctx)    swr_free(&ado_convert_ctx);
+    if (audio_fifo)         av_audio_fifo_free(audio_fifo);
     cout << "over" << endl;
     return 0;
 }
